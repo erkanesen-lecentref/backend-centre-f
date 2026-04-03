@@ -319,9 +319,25 @@ class VectorStore:
 
     def search(self, query: str, module_id: str, top_k: int = 5) -> list[dict]:
         """Recherche sÃ©mantique des chunks les plus pertinents."""
-        query_embedding = self.embed_text(query)
+        # VÃ©rifier d'abord s'il y a des chunks pour ce module
+        # (Ã©vite de charger le modÃ¨le d'embeddings si aucun document n'est indexÃ©)
         conn = self.get_connection()
         cur = conn.cursor()
+        try:
+            cur.execute("SELECT COUNT(*) FROM chunks WHERE module_id = %s", (module_id,))
+            count = cur.fetchone()[0]
+            if count == 0:
+                cur.close()
+                conn.close()
+                return []
+        except Exception:
+            # Table n'existe peut-Ãªtre pas encore
+            conn.rollback()
+            cur.close()
+            conn.close()
+            return []
+
+        query_embedding = self.embed_text(query)
 
         cur.execute(
             """SELECT content, source_file, page_number, section,
@@ -353,23 +369,24 @@ class VectorStore:
 # ============================================================
 
 async def generate_answer(question: str, context_chunks: list[dict], module_name: str) -> dict:
-    """GÃ©nÃ¨re une rÃ©ponse avec l'API Claude en mode RAG."""
+    """GÃ©nÃ¨re une rÃ©ponse avec l'API Claude en mode RAG (ou connaissances gÃ©nÃ©rales si pas de documents)."""
     import anthropic
 
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
-    # Construire le contexte Ã  partir des chunks rÃ©cupÃ©rÃ©s
-    context_parts = []
-    for i, chunk in enumerate(context_chunks):
-        source_info = f"[Source: {chunk['source']}, Page {chunk['page']}"
-        if chunk.get('section'):
-            source_info += f", Section: {chunk['section']}"
-        source_info += f", Pertinence: {chunk['similarity']}]"
-        context_parts.append(f"--- Extrait {i+1} {source_info} ---\n{chunk['content']}")
+    if context_chunks:
+        # Mode RAG : rÃ©ponse basÃ©e sur les documents indexÃ©s
+        context_parts = []
+        for i, chunk in enumerate(context_chunks):
+            source_info = f"[Source: {chunk['source']}, Page {chunk['page']}"
+            if chunk.get('section'):
+                source_info += f", Section: {chunk['section']}"
+            source_info += f", Pertinence: {chunk['similarity']}]"
+            context_parts.append(f"--- Extrait {i+1} {source_info} ---\n{chunk['content']}")
 
-    context = "\n\n".join(context_parts)
+        context = "\n\n".join(context_parts)
 
-    system_prompt = f"""Tu es l'assistant IA de formation du Centre F, spÃ©cialisÃ© dans les diagnostics immobiliers.
+        system_prompt = f"""Tu es l'assistant IA de formation du Centre F, spÃ©cialisÃ© dans les diagnostics immobiliers.
 Tu rÃ©ponds aux questions des apprenants du module "{module_name}".
 
 RÃGLES STRICTES :
@@ -382,6 +399,21 @@ RÃGLES STRICTES :
 
 EXTRAITS DES SUPPORTS DE FORMATION :
 {context}"""
+    else:
+        # Mode connaissances gÃ©nÃ©rales : pas de documents indexÃ©s
+        system_prompt = f"""Tu es l'assistant IA de formation du Centre F, spÃ©cialisÃ© dans les diagnostics immobiliers.
+Tu rÃ©ponds aux questions des apprenants du module "{module_name}".
+
+IMPORTANT : Les supports de formation de ce module n'ont pas encore Ã©tÃ© indexÃ©s dans la base de donnÃ©es.
+Tu dois rÃ©pondre en utilisant tes connaissances gÃ©nÃ©rales sur le sujet du diagnostic immobilier.
+
+RÃGLES :
+1. RÃ©ponds de maniÃ¨re prÃ©cise et professionnelle en te basant sur la rÃ©glementation franÃ§aise en vigueur.
+2. PrÃ©cise clairement que ta rÃ©ponse est basÃ©e sur tes connaissances gÃ©nÃ©rales et non sur les supports du Centre F.
+3. Mentionne les textes rÃ©glementaires pertinents (arrÃªtÃ©s, normes NF, Code de la SantÃ© Publique, etc.).
+4. Utilise un langage professionnel mais accessible.
+5. Structure ta rÃ©ponse avec des paragraphes clairs.
+6. Mets en gras les Ã©lÃ©ments clÃ©s avec **texte**."""
 
     message = client.messages.create(
         model=settings.claude_model,
@@ -392,29 +424,30 @@ EXTRAITS DES SUPPORTS DE FORMATION :
 
     answer_text = message.content[0].text
 
-    # Extraire les sources utilisÃ©es
+    # Extraire les sources utilisÃ©es (uniquement en mode RAG)
     sources = []
-    seen = set()
-    for chunk in context_chunks:
-        key = f"{chunk['source']}_{chunk['page']}"
-        if key not in seen and chunk['similarity'] > 0.3:
-            seen.add(key)
-            source_type = "Support de formation"
-            name = chunk['source'].lower()
-            if "nf " in name or "norme" in name:
-                source_type = "Norme"
-            elif "arrÃªtÃ©" in name or "dÃ©cret" in name or "arretÃ©" in name:
-                source_type = "RÃ©glementation"
-            elif "code" in name or "loi" in name:
-                source_type = "Loi"
+    if context_chunks:
+        seen = set()
+        for chunk in context_chunks:
+            key = f"{chunk['source']}_{chunk['page']}"
+            if key not in seen and chunk['similarity'] > 0.3:
+                seen.add(key)
+                source_type = "Support de formation"
+                name = chunk['source'].lower()
+                if "nf " in name or "norme" in name:
+                    source_type = "Norme"
+                elif "arrÃªtÃ©" in name or "dÃ©cret" in name or "arretÃ©" in name:
+                    source_type = "RÃ©glementation"
+                elif "code" in name or "loi" in name:
+                    source_type = "Loi"
 
-            sources.append({
-                "document": chunk['source'],
-                "page": chunk['page'],
-                "section": chunk.get('section', ''),
-                "type": source_type,
-                "relevance": chunk['similarity']
-            })
+                sources.append({
+                    "document": chunk['source'],
+                    "page": chunk['page'],
+                    "section": chunk.get('section', ''),
+                    "type": source_type,
+                    "relevance": chunk['similarity']
+                })
 
     return {"answer": answer_text, "sources": sources[:5]}
 
@@ -479,16 +512,8 @@ async def ask_question(req: QuestionRequest):
     # 1. Recherche sÃ©mantique des chunks pertinents
     chunks = vector_store.search(req.question, req.module_id, settings.top_k_results)
 
-    if not chunks:
-        return QuestionResponse(
-            answer="Je n'ai pas encore de supports de formation indexÃ©s pour ce module. Contactez votre formateur pour plus d'informations.",
-            sources=[],
-            conversation_id=req.conversation_id or hashlib.md5(str(time.time()).encode()).hexdigest()[:12],
-            module_id=req.module_id,
-            processing_time_ms=int((time.time() - start) * 1000)
-        )
-
     # 2. GÃ©nÃ©ration de la rÃ©ponse avec Claude
+    # Si pas de chunks indexÃ©s, Claude rÃ©pond avec ses connaissances gÃ©nÃ©rales
     result = await generate_answer(req.question, chunks, module["name"])
 
     elapsed = int((time.time() - start) * 1000)

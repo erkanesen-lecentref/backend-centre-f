@@ -321,9 +321,9 @@ class VectorStore:
         """Recherche sÃ©mantique des chunks les plus pertinents."""
         # VÃ©rifier d'abord s'il y a des chunks pour ce module
         # (Ã©vite de charger le modÃ¨le d'embeddings si aucun document n'est indexÃ©)
-        conn = self.get_connection()
-        cur = conn.cursor()
         try:
+            conn = self.get_connection()
+            cur = conn.cursor()
             cur.execute("SELECT COUNT(*) FROM chunks WHERE module_id = %s", (module_id,))
             count = cur.fetchone()[0]
             if count == 0:
@@ -331,10 +331,7 @@ class VectorStore:
                 conn.close()
                 return []
         except Exception:
-            # Table n'existe peut-Ãªtre pas encore
-            conn.rollback()
-            cur.close()
-            conn.close()
+            # Connexion DB ou table non disponible - mode sans base
             return []
 
         query_embedding = self.embed_text(query)

@@ -493,7 +493,7 @@ async def lifespan(app: FastAPI):
 
     # Chercher le fichier chunks
     loaded = False
-    for path in ["chunks.json.gz", "chunks.json", "data/chunks.json.gz", "data/chunks.json"]:
+    for path in ["chunks.json", "data/chunks.json", "chunks.json.gz", "data/chunks.json.gz"]:
         if os.path.exists(path):
             try:
                 chunk_index.load_from_json(path)

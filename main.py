@@ -13,7 +13,6 @@ import gzip
 import hashlib
 import math
 import re
-import traceback
 from datetime import datetime, timedelta
 from typing import Optional
 from contextlib import asynccontextmanager
@@ -43,6 +42,201 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 settings = Settings()
+
+
+# ============================================================
+# CHUNKS DE SECOURS (intégrés au code)
+# ============================================================
+
+FALLBACK_CHUNKS = {
+    "001": [
+        {
+            "s": "Autorisation de détention.pdf",
+            "p": 2,
+            "c": "Page 2/11 Direction générale de la sûreté nucléaire et de la radioprotection6, place du Colonel Bourgoin - 75572 Paris Cedex 12 www.asn.gouv.frAUTORISATION POUR LA DÉTECTION DE PLOMB DANS LES PEINTURE"
+        },
+        {
+            "s": "NF X 46-030.pdf",
+            "p": 22,
+            "c": "— 21 — NF X 46-030 4 Présentation des résultats Afin de faciliter la localisation des me sures, l'auteur du constat divise chaque local en plusieurs zones, auxquelles il attribue une lettre (A, B, C …"
+        },
+        {
+            "s": "Autorisation de détention.pdf",
+            "p": 6,
+            "c": "détenus et , pour chacun d’eux, leur localisation. 11 - Un document (étude de poste…) présentant une estimation de la dose efficace annuelle qui sera reçue par le travailleur le plus exposé, les doses"
+        }
+    ],
+    "002": [
+        {
+            "s": "amiante-protection-travailleurs (1).pdf",
+            "p": 2,
+            "c": "Mise à jour 2 mai 2016 Page 2 SOMMAIRE Introduction ................................ ................................ ................................ ............... 4 Décret n° 2012 -639 du 4 mai 2"
+        },
+        {
+            "s": "GUIDE_amiante_donneurs_d_ordre.pdf",
+            "p": 32,
+            "c": "323 arrêté du 19 août 2011 relatif aux conditions d’accréditation des organismes procédant aux mesures d’empoussièrement en fibres d’amiante dans les immeubles bâtis, et arrêté du 14 août 2012 relatif"
+        },
+        {
+            "s": "GUIDE_amiante_donneurs_d_ordre.pdf",
+            "p": 7,
+            "c": "Haut Conseil de la santé publique, l’amiante pourrait en- traîner entre 68 000 et 100 000 décès par cancer en France, de 2009 à 2050, et aurait été à l’origine de 61 300 à 118 400 décès entre 1955 et "
+        }
+    ],
+    "003": [
+        {
+            "s": "AMAIANTE DTA 21 12 2012.pdf",
+            "p": 5,
+            "c": "30 décembre 2012 JOURNAL OFFICIEL DE LA RÉPUBLIQUE FRANÇAISE Texte 51 sur 168 . .ANNEXE II MODÈLE DE FICHE RÉCAPITULATIVE DU DOSSIER TECHNIQUE « AMIANTE » Cette fiche présente les informations minimal"
+        },
+        {
+            "s": "AMIANTE LISTE C 12 12 2012.pdf",
+            "p": 3,
+            "c": "6 juillet 2013 JOURNAL OFFICIEL DE LA RÉPUBLIQUE FRANÇAISE Texte 14 sur 134 . .9oLes plans ou croquis à jour permettant de localiser les matériaux et produits contenant de l’amiante ; 10oLa signature "
+        },
+        {
+            "s": "001 SUPPORT DE FORMATION A DIFFUSER.pptx",
+            "p": 12,
+            "c": "Le CENTRE F AMIANTE MENTION 202101 REV 03 12 Commanditaire toute personne physique ou morale qui commande l’opération d’examen visuel externe. Il s’agit, généralement, du ou des propriétaires, du synd"
+        }
+    ],
+    "004": [
+        {
+            "s": "Ccorrigé exercice 5 lot autre d'habitati",
+            "p": 3,
+            "c": "ANZ FORMATION | 9 ruelle du maitre d'école 77500 CHELLES | Tél. : 0663573165 N°SIREN : 948520630 | Compagnie d'assurance : KLARITY n° CDIAGK001066 3/4 Dossier 24/IMO/0125 Rapport du : 12/06/2024Diagno"
+        },
+        {
+            "s": "DPE sans mention 2024 REV 00.pptx",
+            "p": 694,
+            "c": "En termes juridiques, un immeuble est un bien non susceptible d'être déplacé. Il peut donc s'agir d'un bâtiment mais également d'une maison, d'un terrain, d'une propriété agricole… Un bien qui ne peut"
+        },
+        {
+            "s": "DPE sans mention 2024 REV 00.pptx",
+            "p": 493,
+            "c": "Le Système Split Cette autre version se compose de deux blocs indépendants. Le premier correspond à l’unité intérieure et a pour rôle de rafraîchir les lieux, il sera donc installé dans la pièce souha"
+        }
+    ],
+    "005": [
+        {
+            "s": "corrigé exercice 3 Usage autre qu'habita",
+            "p": 3,
+            "c": "ANZ FORMATION | 9 ruelle du maitre d'école 77500 CHELLES | Tél. : 0663573165 N°SIREN : 948520630 | Compagnie d'assurance : KLARITY n° CDIAGK001066 3/4 Dossier 24/IMO/0127 Rapport du : 12/06/2024Diagno"
+        },
+        {
+            "s": "Plans maison Clos des Bleuets.pdf",
+            "p": 5,
+            "c": "HAUTEUR maxi FAITAGE / TN 4.68 mPENTE 35 %PIGNONS 0.40 MFACADES 0.40 MDEBORD DE TOITURE Plans non destinés à l'éxécution des travaux, mais réservés à l'obtention des autorisations administratives de c"
+        },
+        {
+            "s": "QCM 1 ENERGIE MENTION CORRIGE.pdf",
+            "p": 8,
+            "c": "Une chaudière équipées de brûleurs à air pulsé 38) Le chauffage d'une CTA peut être assuré par :* Des batteries chaudes électriques Des batteries chaudes hydroliques Des aérothermes 39) Quelles sont l"
+        }
+    ],
+    "006": [
+        {
+            "s": "NFP 03200.pdf",
+            "p": 7,
+            "c": "NF P 03- 200 5 Sommaire Introduction ................................................................................................................................................................ . "
+        },
+        {
+            "s": "NFP 03200.pdf",
+            "p": 14,
+            "c": "NF P 03- 200 12  références cadastrales ;  n° des lots ; informations collectées auprès du donneur d'ordre relatives à des traitements antérieurs contre les agents de dégradations biologiques du boi"
+        },
+        {
+            "s": "NFP 03201 (termites).pdf",
+            "p": 22,
+            "c": "NF P 03-201 ( P 03-201 ) Page 21 Bibliographie [1] NF P 03-200, Agents de dégradation biologique du bois – Constat de l'état parasitaire dans les immeubles bâtis et non bâtis. [2] FD P 20-651, Durabil"
+        }
+    ],
+    "007": [
+        {
+            "s": "FD C 16-600.pdf",
+            "p": 10,
+            "c": "FD C 16 -600 − 8 − B.5 Fiche de contrôle N° 5 – Présence d’une LIAISON EQUIPOTENTIELLE supplémentaire (LES) dans chaque local contenant une baignoire ou une douche ...................................."
+        },
+        {
+            "s": "NF C 15-100.pdf",
+            "p": 21,
+            "c": "NF C 15-100 Index - XII - 2002Courant différentiel -résiduel ..................... 233.7 Définition 411.5.1 Schéma TN 411.5.2 Schéma TT 531.2 Choix DDR Courant d'emploi ..............................."
+        },
+        {
+            "s": "NF C 15-100.pdf",
+            "p": 14,
+            "c": "NF C 15-100 - V - 2002TABLEAU I CORRESPONDANCE ENTRE LA NORME NF C 15-100 ET LES PUBLICATIONS INTERNATIONALES Norme NF C 15-100 Document d'Harmonisation du CENELECPublication CEI TITRE 1 60364-1 TITRE"
+        }
+    ],
+    "008": [
+        {
+            "s": "NF DTU 24 1 P1 MàJ 20.02.06 FS.pdf",
+            "p": 10,
+            "c": "— 9 — NF DTU 24.1 P1 Sommaire (suite) Page 12.4 Carneaux en béton ............................................................................................................. ............... 80 12.4."
+        },
+        {
+            "s": "NF P 45-500.pdf",
+            "p": 31,
+            "c": "— 29 — NF P 45-500 Pour le cas des tiges après compteur et en maison individuelle, l’organe de coupure supplémentaire doit être accessible. La présence d’un dispositif de manœuvre doit être vérifiée. "
+        },
+        {
+            "s": "NF P 45-500.pdf",
+            "p": 17,
+            "c": "— 15 — NF P 45-500 Annexe B (normative) Grille de contrôle (voir 4.2) Init numérotation des tableaux d’annexe [B]!!! Init numérotation des figures d’annexe [B]!!! Init numérotation des équations d’ann"
+        }
+    ],
+    "009": [
+        {
+            "s": "TABLEAUX PARASITES.pdf",
+            "p": 1,
+            "c": "Pas de trous de sorties Souvent aspect feuilleté Trous de sorties + vermoulures dans ou sur le bois Trous de sorties + copeaux Pas de trous de sorties Aspect feuilleté ou Galeries ouvertes Catégories "
+        },
+        {
+            "s": "GUIDE-PRATIQUE-DROM-COM-2022.pdf",
+            "p": 15,
+            "c": "Réglementation diagnostic & traitement Dans le neuf Les articles L 112-17 et R 112-2 à 4 du Code de la construction et de l’Habitation et leur arrêté d’application du 27 juin 2006 prévoient notamment "
+        },
+        {
+            "s": "GUIDE-PRATIQUE-DROM-COM-2022.pdf",
+            "p": 12,
+            "c": "Une lutte efficace. Deux méthodes sous certification : le traitement au moyen de produits biocides et le traitement par la chaleur. Les techniques de préservation des bois en œuvre Chaque situation né"
+        }
+    ],
+    "010": [
+        {
+            "s": "2020-06-08-RTG_guide_revJ (2).pdf",
+            "p": 45,
+            "c": "Comprendre et appliquer la RTG 2020 45 4.6.6.1 Caractéristiques thermiques, énergéti ques et lumineuses des baies et de leurs protections mobiles La RTG2020 introduit un modèle dynamique d’ouverture d"
+        },
+        {
+            "s": "2020-06-08-RTG_guide_revJ (2).pdf",
+            "p": 6,
+            "c": "intégrée de man ière performantielle à la délibération du Calcul RTG au travers du nouvel indicateur PRECS ; • Plateforme de calcul RTG/DPEG : la région Guadeloupe met à disposition gratuitement un no"
+        },
+        {
+            "s": "Cours DPEG-J1.pdf",
+            "p": 20,
+            "c": "Rtg 2020 – principes et évolutions Conditions de conformité Suppression des exigences minimales Approche 100% performantielle Art. 16 : étanchéité à l’air des baies performantiel Art. 17 : surface d’o"
+        }
+    ],
+    "011": [
+        {
+            "s": "DTG PPPT  ITEM 3  DTG -PPPT.pptx",
+            "p": 5,
+            "c": "La loi ALUR ou loi Duflot II du 24 mars 2014 Analyse de l'état apparent des parties communes: Parties de bâtiments (couloirs, chaudière, canalisation, garde-corps...) et des terrains (jardins, parcs.."
+        },
+        {
+            "s": "DTG PPPT  ITEM 2 COPROPRIETE.pptx",
+            "p": 32,
+            "c": "Carnet d’entretien Le carnet d'entretien doit mentionner au minimum les éléments suivants : Adresse de l'immeuble Identité de l'actuel syndic de copropriété Références des contrats d'assurance souscri"
+        },
+        {
+            "s": "DTG PPPT ITEM 1 CONNAISSSANCE  DU BATI.p",
+            "p": 32,
+            "c": "Isolation ITE Les isolants naturels et écologiques Liège : Les panneaux de liège sont un choix écologique pour l’ITE. Ils sont durables, résistants aux intempéries et peuvent être fixés sur les murs a"
+        }
+    ]
+}
 
 
 # ============================================================
@@ -115,9 +309,17 @@ class ChunkIndex:
                     data = json.load(f)
         except Exception as e:
             print(f"ERREUR lors du chargement de {filepath}: {e}")
-            print(traceback.format_exc())
-            return False
+            print("Utilisation des chunks de secours intégrés...")
+            data = FALLBACK_CHUNKS
 
+        self._index_data(data)
+
+    def load_from_dict(self, data: dict):
+        """Charge les chunks depuis un dictionnaire Python."""
+        self._index_data(data)
+
+    def _index_data(self, data: dict):
+        """Indexe les chunks depuis un dictionnaire."""
         for module_id, chunks in data.items():
             self.chunks[module_id] = chunks
             # Pré-calculer les tokens pour chaque chunk
@@ -141,7 +343,6 @@ class ChunkIndex:
 
         total = sum(len(v) for v in self.chunks.values())
         print(f"Index chargé : {total} chunks pour {len(self.chunks)} modules")
-        return True
 
     def search(self, query: str, module_id: str, top_k: int = 5) -> list[dict]:
         """Recherche BM25 des chunks les plus pertinents."""
@@ -287,28 +488,24 @@ chunk_index = ChunkIndex()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup - charger les chunks
-    print("Le Centre F - Assistant IA Backend v2.0")
+    print("Le Centre F - Assistant IA Backend v2.1")
     print(f"Modèle IA : {settings.claude_model}")
 
     # Chercher le fichier chunks
     loaded = False
     for path in ["chunks.json.gz", "chunks.json", "data/chunks.json.gz", "data/chunks.json"]:
         if os.path.exists(path):
-            print(f"Fichier trouvé : {path} ({os.path.getsize(path)} bytes)")
             try:
-                result = chunk_index.load_from_json(path)
-                if result:
-                    loaded = True
-                    break
-                else:
-                    print(f"Echec du chargement de {path}, essai suivant...")
+                chunk_index.load_from_json(path)
+                loaded = True
+                break
             except Exception as e:
-                print(f"ERREUR avec {path}: {e}")
-                print(traceback.format_exc())
+                print(f"Erreur avec {path}: {e}")
                 continue
 
     if not loaded:
-        print("ATTENTION : Aucun fichier de chunks valide trouvé ! L'assistant fonctionnera en mode connaissances générales.")
+        print("Aucun fichier externe trouvé, chargement des chunks de secours...")
+        chunk_index.load_from_dict(FALLBACK_CHUNKS)
 
     yield
     print("Arrêt du serveur...")
@@ -316,7 +513,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Le Centre F - Assistant IA Formation",
     description="API backend pour l'assistant IA de formation aux diagnostics immobiliers",
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan
 )
 
@@ -339,7 +536,7 @@ async def root():
     return {
         "service": "Le Centre F - Assistant IA",
         "status": "online",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "modules": len(MODULES),
         "chunks_indexés": total_chunks
     }

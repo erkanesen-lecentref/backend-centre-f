@@ -13,6 +13,7 @@ import gzip
 import hashlib
 import math
 import re
+import traceback
 from datetime import datetime, timedelta
 from typing import Optional
 from contextlib import asynccontextmanager
@@ -105,12 +106,17 @@ class ChunkIndex:
 
     def load_from_json(self, filepath: str):
         """Charge les chunks depuis un fichier JSON (ou .json.gz)."""
-        if filepath.endswith('.gz'):
-            with gzip.open(filepath, 'rt', encoding='utf-8') as f:
-                data = json.load(f)
-        else:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+        try:
+            if filepath.endswith('.gz'):
+                with gzip.open(filepath, 'rt', encoding='utf-8') as f:
+                    data = json.load(f)
+            else:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+        except Exception as e:
+            print(f"ERREUR lors du chargement de {filepath}: {e}")
+            print(traceback.format_exc())
+            return False
 
         for module_id, chunks in data.items():
             self.chunks[module_id] = chunks
@@ -135,6 +141,7 @@ class ChunkIndex:
 
         total = sum(len(v) for v in self.chunks.values())
         print(f"Index chargé : {total} chunks pour {len(self.chunks)} modules")
+        return True
 
     def search(self, query: str, module_id: str, top_k: int = 5) -> list[dict]:
         """Recherche BM25 des chunks les plus pertinents."""
@@ -284,12 +291,24 @@ async def lifespan(app: FastAPI):
     print(f"Modèle IA : {settings.claude_model}")
 
     # Chercher le fichier chunks
+    loaded = False
     for path in ["chunks.json.gz", "chunks.json", "data/chunks.json.gz", "data/chunks.json"]:
         if os.path.exists(path):
-            chunk_index.load_from_json(path)
-            break
-    else:
-        print("ATTENTION : Aucun fichier de chunks trouvé ! L'assistant fonctionnera en mode connaissances générales.")
+            print(f"Fichier trouvé : {path} ({os.path.getsize(path)} bytes)")
+            try:
+                result = chunk_index.load_from_json(path)
+                if result:
+                    loaded = True
+                    break
+                else:
+                    print(f"Echec du chargement de {path}, essai suivant...")
+            except Exception as e:
+                print(f"ERREUR avec {path}: {e}")
+                print(traceback.format_exc())
+                continue
+
+    if not loaded:
+        print("ATTENTION : Aucun fichier de chunks valide trouvé ! L'assistant fonctionnera en mode connaissances générales.")
 
     yield
     print("Arrêt du serveur...")

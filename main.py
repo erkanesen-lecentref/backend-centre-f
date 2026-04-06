@@ -1,10 +1,10 @@
 """
 Le Centre F - Backend API pour l'Assistant IA Formation
 ========================================================
-Architecture RAG simplifiÃ©e :
-1. Chunks prÃ©-indexÃ©s depuis les supports PDF/PPTX/DOCX (fichier JSON embarquÃ©)
-2. Recherche par mots-clÃ©s (BM25-style) - pas besoin de GPU ni d'embeddings
-3. GÃ©nÃ©ration : API Claude avec contexte + sources
+Architecture RAG simplifiÃÂ©e :
+1. Chunks prÃÂ©-indexÃÂ©s depuis les supports PDF/PPTX/DOCX (fichier JSON embarquÃÂ©)
+2. Recherche par mots-clÃÂ©s (BM25-style) - pas besoin de GPU ni d'embeddings
+3. GÃÂ©nÃÂ©ration : API Claude avec contexte + sources
 """
 
 import os
@@ -45,93 +45,93 @@ settings = Settings()
 
 
 # ============================================================
-# CHUNKS DE SECOURS (intÃ©grÃ©s au code)
+# CHUNKS DE SECOURS (intÃÂ©grÃÂ©s au code)
 # ============================================================
 
 FALLBACK_CHUNKS = {
     "001": [
         {
-            "s": "Autorisation de dÃ©tention.pdf",
+            "s": "Autorisation de dÃÂ©tention.pdf",
             "p": 2,
-            "c": "Page 2/11 Direction gÃ©nÃ©rale de la sÃ»retÃ© nuclÃ©aire et de la radioprotection6, place du Colonel Bourgoin - 75572 Paris Cedex 12 www.asn.gouv.frAUTORISATION POUR LA DÃTECTION DE PLOMB DANS LES PEINTURE"
+            "c": "Page 2/11 Direction gÃÂ©nÃÂ©rale de la sÃÂ»retÃÂ© nuclÃÂ©aire et de la radioprotection6, place du Colonel Bourgoin - 75572 Paris Cedex 12 www.asn.gouv.frAUTORISATION POUR LA DÃÂTECTION DE PLOMB DANS LES PEINTURE"
         },
         {
             "s": "NF X 46-030.pdf",
             "p": 22,
-            "c": "â 21 â NF X 46-030 4 PrÃ©sentation des rÃ©sultats Afin de faciliter la localisation des me sures, l'auteur du constat divise chaque local en plusieurs zones, auxquelles il attribue une lettre (A, B, C â¦"
+            "c": "Ã¢ÂÂ 21 Ã¢ÂÂ NF X 46-030 4 PrÃÂ©sentation des rÃÂ©sultats Afin de faciliter la localisation des me sures, l'auteur du constat divise chaque local en plusieurs zones, auxquelles il attribue une lettre (A, B, C Ã¢ÂÂ¦"
         },
         {
-            "s": "Autorisation de dÃ©tention.pdf",
+            "s": "Autorisation de dÃÂ©tention.pdf",
             "p": 6,
-            "c": "dÃ©tenus et , pour chacun dâeux, leur localisation. 11 - Un document (Ã©tude de posteâ¦) prÃ©sentant une estimation de la dose efficace annuelle qui sera reÃ§ue par le travailleur le plus exposÃ©, les doses"
+            "c": "dÃÂ©tenus et , pour chacun dÃ¢ÂÂeux, leur localisation. 11 - Un document (ÃÂ©tude de posteÃ¢ÂÂ¦) prÃÂ©sentant une estimation de la dose efficace annuelle qui sera reÃÂ§ue par le travailleur le plus exposÃÂ©, les doses"
         }
     ],
     "002": [
         {
             "s": "amiante-protection-travailleurs (1).pdf",
             "p": 2,
-            "c": "Mise Ã  jour 2 mai 2016 Page 2 SOMMAIRE Introduction ................................ ................................ ................................ ............... 4 DÃ©cret nÂ° 2012 -639 du 4 mai 2"
+            "c": "Mise ÃÂ  jour 2 mai 2016 Page 2 SOMMAIRE Introduction ................................ ................................ ................................ ............... 4 DÃÂ©cret nÃÂ° 2012 -639 du 4 mai 2"
         },
         {
             "s": "GUIDE_amiante_donneurs_d_ordre.pdf",
             "p": 32,
-            "c": "323 arrÃªtÃ© du 19 aoÃ»t 2011 relatif aux conditions dâaccrÃ©ditation des organismes procÃ©dant aux mesures dâempoussiÃ¨rement en fibres dâamiante dans les immeubles bÃ¢tis, et arrÃªtÃ© du 14 aoÃ»t 2012 relatif"
+            "c": "323 arrÃÂªtÃÂ© du 19 aoÃÂ»t 2011 relatif aux conditions dÃ¢ÂÂaccrÃÂ©ditation des organismes procÃÂ©dant aux mesures dÃ¢ÂÂempoussiÃÂ¨rement en fibres dÃ¢ÂÂamiante dans les immeubles bÃÂ¢tis, et arrÃÂªtÃÂ© du 14 aoÃÂ»t 2012 relatif"
         },
         {
             "s": "GUIDE_amiante_donneurs_d_ordre.pdf",
             "p": 7,
-            "c": "Haut Conseil de la santÃ© publique, lâamiante pourrait en- traÃ®ner entre 68 000 et 100 000 dÃ©cÃ¨s par cancer en France, de 2009 Ã  2050, et aurait Ã©tÃ© Ã  lâorigine de 61 300 Ã  118 400 dÃ©cÃ¨s entre 1955 et "
+            "c": "Haut Conseil de la santÃÂ© publique, lÃ¢ÂÂamiante pourrait en- traÃÂ®ner entre 68 000 et 100 000 dÃÂ©cÃÂ¨s par cancer en France, de 2009 ÃÂ  2050, et aurait ÃÂ©tÃÂ© ÃÂ  lÃ¢ÂÂorigine de 61 300 ÃÂ  118 400 dÃÂ©cÃÂ¨s entre 1955 et "
         }
     ],
     "003": [
         {
             "s": "AMAIANTE DTA 21 12 2012.pdf",
             "p": 5,
-            "c": "30 dÃ©cembre 2012 JOURNAL OFFICIEL DE LA RÃPUBLIQUE FRANÃAISE Texte 51 sur 168 . .ANNEXE II MODÃLE DE FICHE RÃCAPITULATIVE DU DOSSIER TECHNIQUE Â« AMIANTE Â» Cette fiche prÃ©sente les informations minimal"
+            "c": "30 dÃÂ©cembre 2012 JOURNAL OFFICIEL DE LA RÃÂPUBLIQUE FRANÃÂAISE Texte 51 sur 168 . .ANNEXE II MODÃÂLE DE FICHE RÃÂCAPITULATIVE DU DOSSIER TECHNIQUE ÃÂ« AMIANTE ÃÂ» Cette fiche prÃÂ©sente les informations minimal"
         },
         {
             "s": "AMIANTE LISTE C 12 12 2012.pdf",
             "p": 3,
-            "c": "6 juillet 2013 JOURNAL OFFICIEL DE LA RÃPUBLIQUE FRANÃAISE Texte 14 sur 134 . .9oLes plans ou croquis Ã  jour permettant de localiser les matÃ©riaux et produits contenant de lâamiante ; 10oLa signature "
+            "c": "6 juillet 2013 JOURNAL OFFICIEL DE LA RÃÂPUBLIQUE FRANÃÂAISE Texte 14 sur 134 . .9oLes plans ou croquis ÃÂ  jour permettant de localiser les matÃÂ©riaux et produits contenant de lÃ¢ÂÂamiante ; 10oLa signature "
         },
         {
             "s": "001 SUPPORT DE FORMATION A DIFFUSER.pptx",
             "p": 12,
-            "c": "Le CENTRE F AMIANTE MENTION 202101 REV 03 12 Commanditaire toute personne physique ou morale qui commande lâopÃ©ration dâexamen visuel externe. Il sâagit, gÃ©nÃ©ralement, du ou des propriÃ©taires, du synd"
+            "c": "Le CENTRE F AMIANTE MENTION 202101 REV 03 12 Commanditaire toute personne physique ou morale qui commande lÃ¢ÂÂopÃÂ©ration dÃ¢ÂÂexamen visuel externe. Il sÃ¢ÂÂagit, gÃÂ©nÃÂ©ralement, du ou des propriÃÂ©taires, du synd"
         }
     ],
     "004": [
         {
-            "s": "CcorrigÃ© exercice 5 lot autre d'habitati",
+            "s": "CcorrigÃÂ© exercice 5 lot autre d'habitati",
             "p": 3,
-            "c": "ANZ FORMATION | 9 ruelle du maitre d'Ã©cole 77500 CHELLES | TÃ©l. : 0663573165 NÂ°SIREN : 948520630 | Compagnie d'assurance : KLARITY nÂ° CDIAGK001066 3/4 Dossier 24/IMO/0125 Rapport du : 12/06/2024Diagno"
+            "c": "ANZ FORMATION | 9 ruelle du maitre d'ÃÂ©cole 77500 CHELLES | TÃÂ©l. : 0663573165 NÃÂ°SIREN : 948520630 | Compagnie d'assurance : KLARITY nÃÂ° CDIAGK001066 3/4 Dossier 24/IMO/0125 Rapport du : 12/06/2024Diagno"
         },
         {
             "s": "DPE sans mention 2024 REV 00.pptx",
             "p": 694,
-            "c": "En termes juridiques, un immeuble est un bien non susceptible d'Ãªtre dÃ©placÃ©. Il peut donc s'agir d'un bÃ¢timent mais Ã©galement d'une maison, d'un terrain, d'une propriÃ©tÃ© agricoleâ¦ Un bien qui ne peut"
+            "c": "En termes juridiques, un immeuble est un bien non susceptible d'ÃÂªtre dÃÂ©placÃÂ©. Il peut donc s'agir d'un bÃÂ¢timent mais ÃÂ©galement d'une maison, d'un terrain, d'une propriÃÂ©tÃÂ© agricoleÃ¢ÂÂ¦ Un bien qui ne peut"
         },
         {
             "s": "DPE sans mention 2024 REV 00.pptx",
             "p": 493,
-            "c": "Le SystÃ¨me Split Cette autre version se compose de deux blocs indÃ©pendants. Le premier correspond Ã  lâunitÃ© intÃ©rieure et a pour rÃ´le de rafraÃ®chir les lieux, il sera donc installÃ© dans la piÃ¨ce souha"
+            "c": "Le SystÃÂ¨me Split Cette autre version se compose de deux blocs indÃÂ©pendants. Le premier correspond ÃÂ  lÃ¢ÂÂunitÃÂ© intÃÂ©rieure et a pour rÃÂ´le de rafraÃÂ®chir les lieux, il sera donc installÃÂ© dans la piÃÂ¨ce souha"
         }
     ],
     "005": [
         {
-            "s": "corrigÃ© exercice 3 Usage autre qu'habita",
+            "s": "corrigÃÂ© exercice 3 Usage autre qu'habita",
             "p": 3,
-            "c": "ANZ FORMATION | 9 ruelle du maitre d'Ã©cole 77500 CHELLES | TÃ©l. : 0663573165 NÂ°SIREN : 948520630 | Compagnie d'assurance : KLARITY nÂ° CDIAGK001066 3/4 Dossier 24/IMO/0127 Rapport du : 12/06/2024Diagno"
+            "c": "ANZ FORMATION | 9 ruelle du maitre d'ÃÂ©cole 77500 CHELLES | TÃÂ©l. : 0663573165 NÃÂ°SIREN : 948520630 | Compagnie d'assurance : KLARITY nÃÂ° CDIAGK001066 3/4 Dossier 24/IMO/0127 Rapport du : 12/06/2024Diagno"
         },
         {
             "s": "Plans maison Clos des Bleuets.pdf",
             "p": 5,
-            "c": "HAUTEUR maxi FAITAGE / TN 4.68 mPENTE 35 %PIGNONS 0.40 MFACADES 0.40 MDEBORD DE TOITURE Plans non destinÃ©s Ã  l'Ã©xÃ©cution des travaux, mais rÃ©servÃ©s Ã  l'obtention des autorisations administratives de c"
+            "c": "HAUTEUR maxi FAITAGE / TN 4.68 mPENTE 35 %PIGNONS 0.40 MFACADES 0.40 MDEBORD DE TOITURE Plans non destinÃÂ©s ÃÂ  l'ÃÂ©xÃÂ©cution des travaux, mais rÃÂ©servÃÂ©s ÃÂ  l'obtention des autorisations administratives de c"
         },
         {
             "s": "QCM 1 ENERGIE MENTION CORRIGE.pdf",
             "p": 8,
-            "c": "Une chaudiÃ¨re Ã©quipÃ©es de brÃ»leurs Ã  air pulsÃ© 38) Le chauffage d'une CTA peut Ãªtre assurÃ© par :* Des batteries chaudes Ã©lectriques Des batteries chaudes hydroliques Des aÃ©rothermes 39) Quelles sont l"
+            "c": "Une chaudiÃÂ¨re ÃÂ©quipÃÂ©es de brÃÂ»leurs ÃÂ  air pulsÃÂ© 38) Le chauffage d'une CTA peut ÃÂªtre assurÃÂ© par :* Des batteries chaudes ÃÂ©lectriques Des batteries chaudes hydroliques Des aÃÂ©rothermes 39) Quelles sont l"
         }
     ],
     "006": [
@@ -143,24 +143,24 @@ FALLBACK_CHUNKS = {
         {
             "s": "NFP 03200.pdf",
             "p": 14,
-            "c": "NF P 03- 200 12 ï¾ rÃ©fÃ©rences cadastrales ; ï¾ nÂ° des lots ; informations collectÃ©es auprÃ¨s du donneur d'ordre relatives Ã  des traitements antÃ©rieurs contre les agents de dÃ©gradations biologiques du boi"
+            "c": "NF P 03- 200 12 Ã¯ÂÂ¾ rÃÂ©fÃÂ©rences cadastrales ; Ã¯ÂÂ¾ nÃÂ° des lots ; informations collectÃÂ©es auprÃÂ¨s du donneur d'ordre relatives ÃÂ  des traitements antÃÂ©rieurs contre les agents de dÃÂ©gradations biologiques du boi"
         },
         {
             "s": "NFP 03201 (termites).pdf",
             "p": 22,
-            "c": "NF P 03-201 ( P 03-201 ) Page 21 Bibliographie [1] NF P 03-200, Agents de dÃ©gradation biologique du bois â Constat de l'Ã©tat parasitaire dans les immeubles bÃ¢tis et non bÃ¢tis. [2] FD P 20-651, Durabil"
+            "c": "NF P 03-201 ( P 03-201 ) Page 21 Bibliographie [1] NF P 03-200, Agents de dÃÂ©gradation biologique du bois Ã¢ÂÂ Constat de l'ÃÂ©tat parasitaire dans les immeubles bÃÂ¢tis et non bÃÂ¢tis. [2] FD P 20-651, Durabil"
         }
     ],
     "007": [
         {
             "s": "FD C 16-600.pdf",
             "p": 10,
-            "c": "FD C 16 -600 â 8 â B.5 Fiche de contrÃ´le NÂ° 5 â PrÃ©sence dâune LIAISON EQUIPOTENTIELLE supplÃ©mentaire (LES) dans chaque local contenant une baignoire ou une douche ...................................."
+            "c": "FD C 16 -600 Ã¢ÂÂ 8 Ã¢ÂÂ B.5 Fiche de contrÃÂ´le NÃÂ° 5 Ã¢ÂÂ PrÃÂ©sence dÃ¢ÂÂune LIAISON EQUIPOTENTIELLE supplÃÂ©mentaire (LES) dans chaque local contenant une baignoire ou une douche ...................................."
         },
         {
             "s": "NF C 15-100.pdf",
             "p": 21,
-            "c": "NF C 15-100 Index - XII - 2002Courant diffÃ©rentiel -rÃ©siduel ..................... 233.7 DÃ©finition 411.5.1 SchÃ©ma TN 411.5.2 SchÃ©ma TT 531.2 Choix DDR Courant d'emploi ..............................."
+            "c": "NF C 15-100 Index - XII - 2002Courant diffÃÂ©rentiel -rÃÂ©siduel ..................... 233.7 DÃÂ©finition 411.5.1 SchÃÂ©ma TN 411.5.2 SchÃÂ©ma TT 531.2 Choix DDR Courant d'emploi ..............................."
         },
         {
             "s": "NF C 15-100.pdf",
@@ -170,70 +170,70 @@ FALLBACK_CHUNKS = {
     ],
     "008": [
         {
-            "s": "NF DTU 24 1 P1 MÃ J 20.02.06 FS.pdf",
+            "s": "NF DTU 24 1 P1 MÃÂ J 20.02.06 FS.pdf",
             "p": 10,
-            "c": "â 9 â NF DTU 24.1 P1 Sommaire (suite) Page 12.4 Carneaux en bÃ©ton ............................................................................................................. ............... 80 12.4."
+            "c": "Ã¢ÂÂ 9 Ã¢ÂÂ NF DTU 24.1 P1 Sommaire (suite) Page 12.4 Carneaux en bÃÂ©ton ............................................................................................................. ............... 80 12.4."
         },
         {
             "s": "NF P 45-500.pdf",
             "p": 31,
-            "c": "â 29 â NF P 45-500 Pour le cas des tiges aprÃ¨s compteur et en maison individuelle, lâorgane de coupure supplÃ©mentaire doit Ãªtre accessible. La prÃ©sence dâun dispositif de manÅuvre doit Ãªtre vÃ©rifiÃ©e. "
+            "c": "Ã¢ÂÂ 29 Ã¢ÂÂ NF P 45-500 Pour le cas des tiges aprÃÂ¨s compteur et en maison individuelle, lÃ¢ÂÂorgane de coupure supplÃÂ©mentaire doit ÃÂªtre accessible. La prÃÂ©sence dÃ¢ÂÂun dispositif de manÃÂuvre doit ÃÂªtre vÃÂ©rifiÃÂ©e. "
         },
         {
             "s": "NF P 45-500.pdf",
             "p": 17,
-            "c": "â 15 â NF P 45-500 Annexe B (normative) Grille de contrÃ´le (voir 4.2) Init numÃ©rotation des tableaux dâannexe [B]!!! Init numÃ©rotation des figures dâannexe [B]!!! Init numÃ©rotation des Ã©quations dâann"
+            "c": "Ã¢ÂÂ 15 Ã¢ÂÂ NF P 45-500 Annexe B (normative) Grille de contrÃÂ´le (voir 4.2) Init numÃÂ©rotation des tableaux dÃ¢ÂÂannexe [B]!!! Init numÃÂ©rotation des figures dÃ¢ÂÂannexe [B]!!! Init numÃÂ©rotation des ÃÂ©quations dÃ¢ÂÂann"
         }
     ],
     "009": [
         {
             "s": "TABLEAUX PARASITES.pdf",
             "p": 1,
-            "c": "Pas de trous de sorties Souvent aspect feuilletÃ© Trous de sorties + vermoulures dans ou sur le bois Trous de sorties + copeaux Pas de trous de sorties Aspect feuilletÃ© ou Galeries ouvertes CatÃ©gories "
+            "c": "Pas de trous de sorties Souvent aspect feuilletÃÂ© Trous de sorties + vermoulures dans ou sur le bois Trous de sorties + copeaux Pas de trous de sorties Aspect feuilletÃÂ© ou Galeries ouvertes CatÃÂ©gories "
         },
         {
             "s": "GUIDE-PRATIQUE-DROM-COM-2022.pdf",
             "p": 15,
-            "c": "RÃ©glementation diagnostic & traitement Dans le neuf Les articles L 112-17 et R 112-2 Ã  4 du Code de la construction et de lâHabitation et leur arrÃªtÃ© dâapplication du 27 juin 2006 prÃ©voient notamment "
+            "c": "RÃÂ©glementation diagnostic & traitement Dans le neuf Les articles L 112-17 et R 112-2 ÃÂ  4 du Code de la construction et de lÃ¢ÂÂHabitation et leur arrÃÂªtÃÂ© dÃ¢ÂÂapplication du 27 juin 2006 prÃÂ©voient notamment "
         },
         {
             "s": "GUIDE-PRATIQUE-DROM-COM-2022.pdf",
             "p": 12,
-            "c": "Une lutte efficace. Deux mÃ©thodes sous certification : le traitement au moyen de produits biocides et le traitement par la chaleur. Les techniques de prÃ©servation des bois en Åuvre Chaque situation nÃ©"
+            "c": "Une lutte efficace. Deux mÃÂ©thodes sous certification : le traitement au moyen de produits biocides et le traitement par la chaleur. Les techniques de prÃÂ©servation des bois en ÃÂuvre Chaque situation nÃÂ©"
         }
     ],
     "010": [
         {
             "s": "2020-06-08-RTG_guide_revJ (2).pdf",
             "p": 45,
-            "c": "Comprendre et appliquer la RTG 2020 45 4.6.6.1 CaractÃ©ristiques thermiques, Ã©nergÃ©ti ques et lumineuses des baies et de leurs protections mobiles La RTG2020 introduit un modÃ¨le dynamique dâouverture d"
+            "c": "Comprendre et appliquer la RTG 2020 45 4.6.6.1 CaractÃÂ©ristiques thermiques, ÃÂ©nergÃÂ©ti ques et lumineuses des baies et de leurs protections mobiles La RTG2020 introduit un modÃÂ¨le dynamique dÃ¢ÂÂouverture d"
         },
         {
             "s": "2020-06-08-RTG_guide_revJ (2).pdf",
             "p": 6,
-            "c": "intÃ©grÃ©e de man iÃ¨re performantielle Ã  la dÃ©libÃ©ration du Calcul RTG au travers du nouvel indicateur PRECS ; â¢ Plateforme de calcul RTG/DPEG : la rÃ©gion Guadeloupe met Ã  disposition gratuitement un no"
+            "c": "intÃÂ©grÃÂ©e de man iÃÂ¨re performantielle ÃÂ  la dÃÂ©libÃÂ©ration du Calcul RTG au travers du nouvel indicateur PRECS ; Ã¢ÂÂ¢ Plateforme de calcul RTG/DPEG : la rÃÂ©gion Guadeloupe met ÃÂ  disposition gratuitement un no"
         },
         {
             "s": "Cours DPEG-J1.pdf",
             "p": 20,
-            "c": "Rtg 2020 â principes et Ã©volutions Conditions de conformitÃ© Suppression des exigences minimales Approche 100% performantielle Art. 16 : Ã©tanchÃ©itÃ© Ã  lâair des baies performantiel Art. 17 : surface dâo"
+            "c": "Rtg 2020 Ã¢ÂÂ principes et ÃÂ©volutions Conditions de conformitÃÂ© Suppression des exigences minimales Approche 100% performantielle Art. 16 : ÃÂ©tanchÃÂ©itÃÂ© ÃÂ  lÃ¢ÂÂair des baies performantiel Art. 17 : surface dÃ¢ÂÂo"
         }
     ],
     "011": [
         {
             "s": "DTG PPPT  ITEM 3  DTG -PPPT.pptx",
             "p": 5,
-            "c": "La loi ALUR ou loi Duflot II du 24 mars 2014 Analyse de l'Ã©tat apparent des parties communes: Parties de bÃ¢timents (couloirs, chaudiÃ¨re, canalisation, garde-corps...) et des terrains (jardins, parcs.."
+            "c": "La loi ALUR ou loi Duflot II du 24 mars 2014 Analyse de l'ÃÂ©tat apparent des parties communes: Parties de bÃÂ¢timents (couloirs, chaudiÃÂ¨re, canalisation, garde-corps...) et des terrains (jardins, parcs.."
         },
         {
             "s": "DTG PPPT  ITEM 2 COPROPRIETE.pptx",
             "p": 32,
-            "c": "Carnet dâentretien Le carnet d'entretien doit mentionner au minimum les Ã©lÃ©ments suivants : Adresse de l'immeuble IdentitÃ© de l'actuel syndic de copropriÃ©tÃ© RÃ©fÃ©rences des contrats d'assurance souscri"
+            "c": "Carnet dÃ¢ÂÂentretien Le carnet d'entretien doit mentionner au minimum les ÃÂ©lÃÂ©ments suivants : Adresse de l'immeuble IdentitÃÂ© de l'actuel syndic de copropriÃÂ©tÃÂ© RÃÂ©fÃÂ©rences des contrats d'assurance souscri"
         },
         {
             "s": "DTG PPPT ITEM 1 CONNAISSSANCE  DU BATI.p",
             "p": 32,
-            "c": "Isolation ITE Les isolants naturels et Ã©cologiques LiÃ¨ge : Les panneaux de liÃ¨ge sont un choix Ã©cologique pour lâITE. Ils sont durables, rÃ©sistants aux intempÃ©ries et peuvent Ãªtre fixÃ©s sur les murs a"
+            "c": "Isolation ITE Les isolants naturels et ÃÂ©cologiques LiÃÂ¨ge : Les panneaux de liÃÂ¨ge sont un choix ÃÂ©cologique pour lÃ¢ÂÂITE. Ils sont durables, rÃÂ©sistants aux intempÃÂ©ries et peuvent ÃÂªtre fixÃÂ©s sur les murs a"
         }
     ]
 }
@@ -263,34 +263,34 @@ class QuestionResponse(BaseModel):
 MODULES = {
     "001": {"name": "Plomb (CREP)", "description": "Constat de Risque d'Exposition au Plomb"},
     "002": {"name": "Amiante sans mention", "description": "Diagnostic amiante - niveau de base"},
-    "003": {"name": "Amiante avec mention", "description": "Diagnostic amiante - niveau avancÃ©"},
-    "004": {"name": "Ãnergie sans mention", "description": "DPE - Diagnostic de Performance ÃnergÃ©tique"},
-    "005": {"name": "Ãnergie avec mention", "description": "DPE - niveau avancÃ© (tertiaire/ERP)"},
-    "006": {"name": "Termites MÃ©tropole", "description": "Diagnostic termites France mÃ©tropolitaine"},
-    "007": {"name": "ÃlectricitÃ©", "description": "Diagnostic installation Ã©lectrique"},
+    "003": {"name": "Amiante avec mention", "description": "Diagnostic amiante - niveau avancÃÂ©"},
+    "004": {"name": "ÃÂnergie sans mention", "description": "DPE - Diagnostic de Performance ÃÂnergÃÂ©tique"},
+    "005": {"name": "ÃÂnergie avec mention", "description": "DPE - niveau avancÃÂ© (tertiaire/ERP)"},
+    "006": {"name": "Termites MÃÂ©tropole", "description": "Diagnostic termites France mÃÂ©tropolitaine"},
+    "007": {"name": "ÃÂlectricitÃÂ©", "description": "Diagnostic installation ÃÂ©lectrique"},
     "008": {"name": "Gaz", "description": "Diagnostic installation gaz"},
     "009": {"name": "Termites DROM", "description": "Diagnostic termites DOM-ROM"},
-    "010": {"name": "DPEG", "description": "Diagnostic de Performance ÃnergÃ©tique Global"},
+    "010": {"name": "DPEG", "description": "Diagnostic de Performance ÃÂnergÃÂ©tique Global"},
     "011": {"name": "DTG / PPT", "description": "Diagnostic Technique Global & Plan Pluriannuel de Travaux"},
 }
 
 
 # ============================================================
-# RECHERCHE PAR MOTS-CLÃS (BM25-STYLE)
+# RECHERCHE PAR MOTS-CLÃÂS (BM25-STYLE)
 # ============================================================
 
-# Stopwords franÃ§ais pour la recherche
-STOPWORDS = set("le la les un une des de du d l Ã  au aux en et ou mais si car ni ne pas que qui quoi dont oÃ¹ ce ces cette cet son sa ses leur leurs mon ma mes ton ta tes il elle on nous vous ils elles je tu me te se lui y a est sont Ã©tÃ© Ãªtre avoir fait faire peut plus trÃ¨s tout tous toute toutes autre autres mÃªme aussi bien par pour avec sans dans sur entre chez vers quel quelle quels quelles comme comment quand encore dÃ©jÃ ".split())
+# Stopwords franÃÂ§ais pour la recherche
+STOPWORDS = set("le la les un une des de du d l ÃÂ  au aux en et ou mais si car ni ne pas que qui quoi dont oÃÂ¹ ce ces cette cet son sa ses leur leurs mon ma mes ton ta tes il elle on nous vous ils elles je tu me te se lui y a est sont ÃÂ©tÃÂ© ÃÂªtre avoir fait faire peut plus trÃÂ¨s tout tous toute toutes autre autres mÃÂªme aussi bien par pour avec sans dans sur entre chez vers quel quelle quels quelles comme comment quand encore dÃÂ©jÃÂ ".split())
 
 def tokenize(text: str) -> list[str]:
-    """Tokenise un texte en mots normalisÃ©s."""
+    """Tokenise un texte en mots normalisÃÂ©s."""
     text = text.lower()
-    text = re.sub(r'[^a-zÃ Ã¢Ã¤Ã©Ã¨ÃªÃ«Ã¯Ã®Ã´Ã¹Ã»Ã¼Ã¿Ã§ÅÃ¦0-9\s-]', ' ', text)
+    text = re.sub(r'[^a-zÃÂ ÃÂ¢ÃÂ¤ÃÂ©ÃÂ¨ÃÂªÃÂ«ÃÂ¯ÃÂ®ÃÂ´ÃÂ¹ÃÂ»ÃÂ¼ÃÂ¿ÃÂ§ÃÂÃÂ¦0-9\s-]', ' ', text)
     words = text.split()
     return [w for w in words if w not in STOPWORDS and len(w) > 2]
 
 class ChunkIndex:
-    """Index de recherche BM25 sur les chunks prÃ©-extraits."""
+    """Index de recherche BM25 sur les chunks prÃÂ©-extraits."""
 
     def __init__(self):
         self.chunks = {}  # module_id -> list of chunks
@@ -309,7 +309,7 @@ class ChunkIndex:
                     data = json.load(f)
         except Exception as e:
             print(f"ERREUR lors du chargement de {filepath}: {e}")
-            print("Utilisation des chunks de secours intÃ©grÃ©s...")
+            print("Utilisation des chunks de secours intÃÂ©grÃÂ©s...")
             data = FALLBACK_CHUNKS
 
         self._index_data(data)
@@ -322,7 +322,7 @@ class ChunkIndex:
         """Indexe les chunks depuis un dictionnaire."""
         for module_id, chunks in data.items():
             self.chunks[module_id] = chunks
-            # PrÃ©-calculer les tokens pour chaque chunk
+            # PrÃÂ©-calculer les tokens pour chaque chunk
             tokens_list = [tokenize(c["c"]) for c in chunks]
             self.doc_tokens[module_id] = tokens_list
 
@@ -342,7 +342,7 @@ class ChunkIndex:
             self.avg_dl[module_id] = sum(len(t) for t in tokens_list) / n
 
         total = sum(len(v) for v in self.chunks.values())
-        print(f"Index chargÃ© : {total} chunks pour {len(self.chunks)} modules")
+        print(f"Index chargÃÂ© : {total} chunks pour {len(self.chunks)} modules")
 
     def search(self, query: str, module_id: str, top_k: int = 5) -> list[dict]:
         """Recherche BM25 des chunks les plus pertinents."""
@@ -374,7 +374,7 @@ class ChunkIndex:
             if score > 0:
                 scores.append((i, score))
 
-        # Trier par score dÃ©croissant
+        # Trier par score dÃÂ©croissant
         scores.sort(key=lambda x: x[1], reverse=True)
 
         results = []
@@ -395,17 +395,17 @@ class ChunkIndex:
 
 
 # ============================================================
-# GÃNÃRATION IA (Claude API)
+# GÃÂNÃÂRATION IA (Claude API)
 # ============================================================
 
 async def generate_answer(question: str, context_chunks: list[dict], module_name: str) -> dict:
-    """GÃ©nÃ¨re une rÃ©ponse avec l'API Claude en mode RAG."""
+    """GÃÂ©nÃÂ¨re une rÃÂ©ponse avec l'API Claude en mode RAG."""
     import anthropic
 
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
     if context_chunks:
-        # Mode RAG : rÃ©ponse basÃ©e sur les documents indexÃ©s
+        # Mode RAG : rÃÂ©ponse basÃÂ©e sur les documents indexÃÂ©s
         context_parts = []
         for i, chunk in enumerate(context_chunks):
             source_info = f"[Source: {chunk['source']}, Page {chunk['page']}"
@@ -416,30 +416,30 @@ async def generate_answer(question: str, context_chunks: list[dict], module_name
 
         context = "\n\n".join(context_parts)
 
-        system_prompt = f"""Tu es l'assistant IA de formation du Centre F, spÃ©cialisÃ© dans les diagnostics immobiliers.
-Tu rÃ©ponds aux questions des apprenants du module "{module_name}".
+        system_prompt = f"""Tu es l'assistant IA de formation du Centre F, spÃÂ©cialisÃÂ© dans les diagnostics immobiliers.
+Tu rÃÂ©ponds aux questions des apprenants du module "{module_name}".
 
-RÃGLES STRICTES :
-1. RÃ©ponds en te basant PRINCIPALEMENT sur les extraits de documents fournis ci-dessous.
-2. Tu peux complÃ©ter avec tes connaissances rÃ©glementaires si les extraits sont insuffisants, mais prÃ©cise-le.
+RÃÂGLES STRICTES :
+1. RÃÂ©ponds en te basant PRINCIPALEMENT sur les extraits de documents fournis ci-dessous.
+2. Tu peux complÃÂ©ter avec tes connaissances rÃÂ©glementaires si les extraits sont insuffisants, mais prÃÂ©cise-le.
 3. Cite TOUJOURS tes sources (nom du document, page) pour les informations issues des extraits.
-4. Mentionne les textes rÃ©glementaires pertinents (arrÃªtÃ©s, normes NF, Code de la SantÃ© Publique, etc.).
+4. Mentionne les textes rÃÂ©glementaires pertinents (arrÃÂªtÃÂ©s, normes NF, Code de la SantÃÂ© Publique, etc.).
 5. Utilise un langage professionnel mais accessible.
-6. Structure ta rÃ©ponse avec des paragraphes clairs.
-7. Mets en gras les Ã©lÃ©ments clÃ©s avec **texte**.
+6. Structure ta rÃÂ©ponse avec des paragraphes clairs.
+7. Mets en gras les ÃÂ©lÃÂ©ments clÃÂ©s avec **texte**.
 
 EXTRAITS DES SUPPORTS DE FORMATION DU CENTRE F :
 {context}"""
     else:
-        # Mode connaissances gÃ©nÃ©rales (fallback)
-        system_prompt = f"""Tu es l'assistant IA de formation du Centre F, spÃ©cialisÃ© dans les diagnostics immobiliers.
-Tu rÃ©ponds aux questions des apprenants du module "{module_name}".
+        # Mode connaissances gÃÂ©nÃÂ©rales (fallback)
+        system_prompt = f"""Tu es l'assistant IA de formation du Centre F, spÃÂ©cialisÃÂ© dans les diagnostics immobiliers.
+Tu rÃÂ©ponds aux questions des apprenants du module "{module_name}".
 
-RÃ©ponds en te basant sur la rÃ©glementation franÃ§aise en vigueur concernant les diagnostics immobiliers.
-Mentionne les textes rÃ©glementaires pertinents (arrÃªtÃ©s, normes NF, Code de la SantÃ© Publique, etc.).
+RÃÂ©ponds en te basant sur la rÃÂ©glementation franÃÂ§aise en vigueur concernant les diagnostics immobiliers.
+Mentionne les textes rÃÂ©glementaires pertinents (arrÃÂªtÃÂ©s, normes NF, Code de la SantÃÂ© Publique, etc.).
 Utilise un langage professionnel mais accessible.
-Structure ta rÃ©ponse avec des paragraphes clairs.
-Mets en gras les Ã©lÃ©ments clÃ©s avec **texte**."""
+Structure ta rÃÂ©ponse avec des paragraphes clairs.
+Mets en gras les ÃÂ©lÃÂ©ments clÃÂ©s avec **texte**."""
 
     message = client.messages.create(
         model=settings.claude_model,
@@ -450,7 +450,7 @@ Mets en gras les Ã©lÃ©ments clÃ©s avec **texte**."""
 
     answer_text = message.content[0].text
 
-    # Extraire les sources utilisÃ©es (uniquement en mode RAG)
+    # Extraire les sources utilisÃÂ©es (uniquement en mode RAG)
     sources = []
     if context_chunks:
         seen = set()
@@ -462,8 +462,8 @@ Mets en gras les Ã©lÃ©ments clÃ©s avec **texte**."""
                 name = chunk['source'].lower()
                 if "nf " in name or "norme" in name:
                     source_type = "Norme"
-                elif "arrÃªtÃ©" in name or "dÃ©cret" in name or "arretÃ©" in name or "arrete" in name:
-                    source_type = "RÃ©glementation"
+                elif "arrÃÂªtÃÂ©" in name or "dÃÂ©cret" in name or "arretÃÂ©" in name or "arrete" in name:
+                    source_type = "RÃÂ©glementation"
                 elif "code" in name or "loi" in name:
                     source_type = "Loi"
 
@@ -482,14 +482,14 @@ Mets en gras les Ã©lÃ©ments clÃ©s avec **texte**."""
 # APPLICATION FASTAPI
 # ============================================================
 
-# Charger l'index au dÃ©marrage
+# Charger l'index au dÃÂ©marrage
 chunk_index = ChunkIndex()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup - charger les chunks
     print("Le Centre F - Assistant IA Backend v2.1")
-    print(f"ModÃ¨le IA : {settings.claude_model}")
+    print(f"ModÃÂ¨le IA : {settings.claude_model}")
 
     # Chercher le fichier chunks
     loaded = False
@@ -504,11 +504,11 @@ async def lifespan(app: FastAPI):
                 continue
 
     if not loaded:
-        print("Aucun fichier externe trouvÃ©, chargement des chunks de secours...")
+        print("Aucun fichier externe trouvÃÂ©, chargement des chunks de secours...")
         chunk_index.load_from_dict(FALLBACK_CHUNKS)
 
     yield
-    print("ArrÃªt du serveur...")
+    print("ArrÃÂªt du serveur...")
 
 app = FastAPI(
     title="Le Centre F - Assistant IA Formation",
@@ -538,7 +538,7 @@ async def root():
         "status": "online",
         "version": "2.1.0",
         "modules": len(MODULES),
-        "chunks_indexÃ©s": total_chunks
+        "chunks_indexÃÂ©s": total_chunks
     }
 
 @app.get("/api/health")
@@ -557,7 +557,7 @@ async def list_modules():
 
 @app.post("/api/ask", response_model=QuestionResponse)
 async def ask_question(req: QuestionRequest):
-    """Pose une question Ã  l'assistant IA sur un module."""
+    """Pose une question ÃÂ  l'assistant IA sur un module."""
     import time
     start = time.time()
 
@@ -569,7 +569,7 @@ async def ask_question(req: QuestionRequest):
     # 1. Recherche BM25 des chunks pertinents
     chunks = chunk_index.search(req.question, req.module_id, settings.top_k_results)
 
-    # 2. GÃ©nÃ©ration de la rÃ©ponse avec Claude
+    # 2. GÃÂ©nÃÂ©ration de la rÃÂ©ponse avec Claude
     result = await generate_answer(req.question, chunks, module["name"])
 
     elapsed = int((time.time() - start) * 1000)
@@ -592,13 +592,13 @@ async def get_stats():
             by_module[mid] = count
     return {
         "total_chunks": sum(by_module.values()),
-        "modules_indexÃ©s": len(by_module),
+        "modules_indexÃÂ©s": len(by_module),
         "by_module": by_module
     }
 
 
 # ============================================================
-# POINT D'ENTRÃE
+# POINT D'ENTRÃÂE
 # ============================================================
 
 if __name__ == "__main__":
@@ -686,6 +686,7 @@ async def admin_upload_chunks(file: UploadFile = File(...), admin_key: str = "")
 # Chunked Base64 Upload (for large files)
 # ============================================
 _b64_chunks = {}
+_UPLOAD_DIR = "_upload_chunks"
 
 @app.post("/api/admin/upload-b64-chunk")
 async def upload_b64_chunk(request: Request):
@@ -694,18 +695,23 @@ async def upload_b64_chunk(request: Request):
         raise HTTPException(status_code=403, detail="Invalid admin key")
     idx = body["index"]
     data = body["data"]
-    _b64_chunks[idx] = data
-    total_bytes = sum(len(v) for v in _b64_chunks.values())
-    return {"status": "ok", "chunk_index": idx, "chunks_received": len(_b64_chunks), "total_b64_bytes": total_bytes}
+    os.makedirs(_UPLOAD_DIR, exist_ok=True)
+    with open(os.path.join(_UPLOAD_DIR, f"chunk_{idx:04d}.txt"), "w") as f:
+        f.write(data)
+    chunks = [c for c in os.listdir(_UPLOAD_DIR) if c.startswith("chunk_")]
+    total_bytes = sum(os.path.getsize(os.path.join(_UPLOAD_DIR, c)) for c in chunks)
+    return {"status": "ok", "chunk_index": idx, "chunks_received": len(chunks), "total_b64_bytes": total_bytes}
 
 @app.post("/api/admin/finalize-b64-upload")
 async def finalize_b64_upload(request: Request):
     body = await request.json()
     if body.get("admin_key") != ADMIN_KEY:
         raise HTTPException(status_code=403, detail="Invalid admin key")
+    files = sorted([f for f in os.listdir(_UPLOAD_DIR) if f.startswith("chunk_")])
     combined = ""
-    for i in sorted(_b64_chunks.keys()):
-        combined += _b64_chunks[i]
+    for fname in files:
+        with open(os.path.join(_UPLOAD_DIR, fname), "r") as f:
+            combined += f.read()
     import base64 as b64mod
     binary_data = b64mod.b64decode(combined)
     json_bytes = gzip.decompress(binary_data)
@@ -719,10 +725,15 @@ async def finalize_b64_upload(request: Request):
     chunk_index.avg_dl = {}
     chunk_index._index_data(chunks_data)
     total = sum(len(v) for v in chunk_index.chunks.values())
+    import shutil
+    shutil.rmtree(_UPLOAD_DIR, ignore_errors=True)
     _b64_chunks.clear()
     return {"status": "ok", "total_chunks": total, "modules": len(chunk_index.chunks)}
 
 @app.get("/api/admin/upload-status")
 async def upload_status():
-    total_bytes = sum(len(v) for v in _b64_chunks.values())
-    return {"chunks_received": len(_b64_chunks), "total_b64_bytes": total_bytes}
+    if os.path.isdir(_UPLOAD_DIR):
+        chunks = [c for c in os.listdir(_UPLOAD_DIR) if c.startswith("chunk_")]
+        total_bytes = sum(os.path.getsize(os.path.join(_UPLOAD_DIR, c)) for c in chunks)
+        return {"chunks_received": len(chunks), "total_b64_bytes": total_bytes}
+    return {"chunks_received": 0, "total_b64_bytes": 0}

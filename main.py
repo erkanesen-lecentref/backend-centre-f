@@ -679,3 +679,50 @@ async def admin_upload_chunks(file: UploadFile = File(...), admin_key: str = "")
         return {"status": "ok", "chunks_loaded": total, "modules": len(chunk_index.chunks)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# ============================================
+# Chunked Base64 Upload (for large files)
+# ============================================
+_b64_chunks = {}
+
+@app.post("/api/admin/upload-b64-chunk")
+async def upload_b64_chunk(request: Request):
+    body = await request.json()
+    if body.get("admin_key") != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+    idx = body["index"]
+    data = body["data"]
+    _b64_chunks[idx] = data
+    total_bytes = sum(len(v) for v in _b64_chunks.values())
+    return {"status": "ok", "chunk_index": idx, "chunks_received": len(_b64_chunks), "total_b64_bytes": total_bytes}
+
+@app.post("/api/admin/finalize-b64-upload")
+async def finalize_b64_upload(request: Request):
+    body = await request.json()
+    if body.get("admin_key") != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+    combined = ""
+    for i in sorted(_b64_chunks.keys()):
+        combined += _b64_chunks[i]
+    import base64 as b64mod
+    binary_data = b64mod.b64decode(combined)
+    json_bytes = gzip.decompress(binary_data)
+    chunks_data = json.loads(json_bytes)
+    with gzip.open("chunks_uploaded.json.gz", "wb") as f:
+        f.write(json.dumps(chunks_data, ensure_ascii=False).encode("utf-8"))
+    global chunk_index
+    chunk_index.chunks = {}
+    chunk_index.doc_tokens = {}
+    chunk_index.idf = {}
+    chunk_index.avg_dl = {}
+    chunk_index._index_data(chunks_data)
+    total = sum(len(v) for v in chunk_index.chunks.values())
+    _b64_chunks.clear()
+    return {"status": "ok", "total_chunks": total, "modules": len(chunk_index.chunks)}
+
+@app.get("/api/admin/upload-status")
+async def upload_status():
+    total_bytes = sum(len(v) for v in _b64_chunks.values())
+    return {"chunks_received": len(_b64_chunks), "total_b64_bytes": total_bytes}
